@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// Use relative path for Next.js API routes (works both local and production automatically)
+const API_URL = '/api';
 
 export const api = {
     // Products
@@ -25,6 +26,24 @@ export const api = {
         return res.json();
     },
 
+    updateArrivage: async (id: string, data: any) => {
+        const res = await fetch(`${API_URL}/arrivages/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('Failed to update arrivage');
+        return res.json();
+    },
+
+    deleteArrivage: async (id: string) => {
+        const res = await fetch(`${API_URL}/arrivages/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete arrivage');
+        return true;
+    },
+
     // Transactions
     recordVente: async (data: any) => {
         const res = await fetch(`${API_URL}/transactions/vente`, {
@@ -49,6 +68,20 @@ export const api = {
             const err = await res.json();
             throw new Error(err.error || 'Failed to record achat');
         }
+        return res.json();
+    },
+
+    // Ventes (Generic List)
+    getVentes: async () => {
+        const res = await fetch(`${API_URL}/ventes`);
+        if (!res.ok) throw new Error('Failed to fetch ventes');
+        return res.json();
+    },
+
+    // Achats (Generic List)
+    getAchats: async () => {
+        const res = await fetch(`${API_URL}/achats`);
+        if (!res.ok) throw new Error('Failed to fetch achats');
         return res.json();
     },
 

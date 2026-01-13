@@ -61,6 +61,11 @@ const { getStorage } = require('firebase-admin/storage');
 
 app.use(cors());
 
+// Health Check / Root Route
+app.get('/', (req, res) => {
+  res.send('Gestion Flaelle API is running');
+});
+
 // Configure Multer for memory storage (file uploads)
 const upload = multer({ storage: multer.memoryStorage() });
 

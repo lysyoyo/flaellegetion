@@ -14,10 +14,13 @@ import { Modal } from '@/components/Modal';
 import { Label } from '@/components/Label';
 import { Pencil, Trash2, Plus, Search, Upload, Image as ImageIcon } from 'lucide-react';
 
+import { api } from '@/lib/api'; // Import API helper
+
 export default function StockPage() {
   const [produits, setProduits] = useState<Produit[]>([]);
   const [arrivages, setArrivages] = useState<Arrivage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // New Error State
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduit, setEditingProduit] = useState<Produit | null>(null);
@@ -40,18 +43,18 @@ export default function StockPage() {
 
   const fetchData = async () => {
     try {
-      const q = query(collection(db, 'produits'));
-      const qArrivages = query(collection(db, 'arrivages'), orderBy('date', 'desc'));
-
-      const [produitsSnap, arrivagesSnap] = await Promise.all([
-        getDocs(q),
-        getDocs(qArrivages)
+      setLoading(true);
+      const [produitsData, arrivagesData] = await Promise.all([
+        api.getProducts(),
+        api.getArrivages()
       ]);
 
-      setProduits(produitsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Produit)));
-      setArrivages(arrivagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Arrivage)));
-    } catch (error) {
+      setProduits(produitsData);
+      setArrivages(arrivagesData);
+      setError(null);
+    } catch (error: any) {
       console.error('Error fetching data:', error);
+      setError("Impossible de charger les données. Veuillez vérifier que l'API est activée (voir console logs).");
     } finally {
       setLoading(false);
     }
@@ -67,9 +70,9 @@ export default function StockPage() {
       const downloadURL = await getDownloadURL(snapshot.ref);
       return downloadURL;
     } catch (error) {
-      console.error("Upload failed", error);
-      alert("Erreur lors de l'upload de l'image");
-      return '';
+      console.error("Upload failed (Bucket missing?):", error);
+      // alert("Erreur lors de l'upload de l'image"); // Suppressed per user request
+      return ''; // Return empty to allow saving product without image
     } finally {
       setUploading(false);
     }
@@ -149,7 +152,12 @@ export default function StockPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {error ? (
+            <div className="p-8 text-center text-red-500 bg-red-50 rounded-lg border border-red-200">
+              <p className="font-bold">Erreur de chargement</p>
+              <p>{error}</p>
+            </div>
+          ) : loading ? (
             <div className="flex justify-center p-8">Chargement...</div>
           ) : (
             <Table>
@@ -158,7 +166,6 @@ export default function StockPage() {
                   <TableHead>Image</TableHead>
                   <TableHead>Produit</TableHead>
                   <TableHead>Balle / Arrivage</TableHead>
-                  <TableHead>Prix Achat (Unitaire)</TableHead>
                   <TableHead>Prix Vente</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -191,7 +198,6 @@ export default function StockPage() {
                           <span className="text-xs text-gray-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell>{produit.prix_achat.toLocaleString()} FCFA</TableCell>
                       <TableCell>{produit.prix_vente.toLocaleString()} FCFA</TableCell>
                       <TableCell>
                         <Badge variant={produit.quantite > 5 ? "secondary" : "destructive"}>
@@ -254,6 +260,7 @@ export default function StockPage() {
               />
             </div>
             {imageFile && <span className="text-xs text-primary font-medium">Image sélectionnée: {imageFile.name} (Non enregistrée)</span>}
+
           </div>
 
           <div className="space-y-2">
@@ -265,23 +272,16 @@ export default function StockPage() {
                 const selectedId = e.target.value;
                 const selectedArrivage = arrivages.find(a => a.id === selectedId);
 
-                // Smart Logic: Auto-calculate approximate unit cost
-                let estimatedUnitCost = formData.prix_achat;
-                if (selectedArrivage && selectedArrivage.nombre_articles_estimes > 0) {
-                  estimatedUnitCost = Math.round(selectedArrivage.cout_total / selectedArrivage.nombre_articles_estimes);
-                }
-
                 setFormData({
                   ...formData,
-                  arrivage_id: selectedId,
-                  prix_achat: estimatedUnitCost
+                  arrivage_id: selectedId
                 });
               }}
             >
               <option value="">-- Aucun / Stock Ancien --</option>
               {arrivages.map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.nom} (Coût unitaire env. {Math.round(a.cout_total / a.nombre_articles_estimes)}F)
+                  {a.nom} (Source)
                 </option>
               ))}
             </select>
@@ -298,30 +298,6 @@ export default function StockPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="prix_achat">Prix d'achat (Est.)</Label>
-              <Input
-                id="prix_achat"
-                type="number"
-                required
-                value={formData.prix_achat}
-                onChange={(e) => setFormData({ ...formData, prix_achat: Number(e.target.value) })}
-                placeholder="Coût unitaire approx."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="prix_vente">Prix de vente</Label>
-              <Input
-                id="prix_vente"
-                type="number"
-                required
-                value={formData.prix_vente}
-                onChange={(e) => setFormData({ ...formData, prix_vente: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="quantite">Quantité en stock</Label>
             <Input
@@ -333,6 +309,21 @@ export default function StockPage() {
             />
           </div>
 
+
+          <div className="space-y-2">
+            <Label htmlFor="prix_vente">Prix de vente</Label>
+            <Input
+              id="prix_vente"
+              type="number"
+              required
+              value={formData.prix_vente === 0 ? '' : formData.prix_vente}
+              onChange={(e) => setFormData({ ...formData, prix_vente: e.target.value === '' ? 0 : Number(e.target.value) })}
+              placeholder="0"
+            />
+          </div>
+
+
+
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="ghost" onClick={handleCloseModal}>
               Annuler
@@ -343,6 +334,6 @@ export default function StockPage() {
           </div>
         </form>
       </Modal>
-    </div>
+    </div >
   );
 }

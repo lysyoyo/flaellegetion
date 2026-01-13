@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/Label';
 import { Modal } from '@/components/Modal';
 import { Badge } from '@/components/Badge';
-import { Plus, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Package, DollarSign, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function ArrivagesPage() {
@@ -34,18 +34,15 @@ export default function ArrivagesPage() {
     const fetchData = async () => {
         try {
             // Use API to fetch data
-            const [arrivagesData, produitsData] = await Promise.all([
+            const [arrivagesData, produitsData, ventesData] = await Promise.all([
                 api.getArrivages(),
-                api.getProducts() // We fetch products to calculate sales? Or fetches sales? 
-                // Original code fetched 'ventes'. server.js generic route supports 'ventes'.
+                api.getProducts(),
+                api.getVentes()
             ]);
-
-            // Wait, we need 'ventes' for stats. generic route /api/ventes works.
-            const resVentes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/ventes`);
-            const ventesData = await resVentes.json();
 
             setArrivages(arrivagesData);
             setVentes(ventesData);
+
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
@@ -102,6 +99,28 @@ export default function ArrivagesPage() {
         setIsDetailsOpen(true);
     };
 
+    const handleArchive = async (id: string) => {
+        if (!confirm("Voulez-vous archiver cet arrivage ? Il ne sera plus proposé par défaut dans les nouveaux produits.")) return;
+        try {
+            await api.updateArrivage(id, { statut: 'archivé' });
+            fetchData();
+        } catch (error) {
+            console.error("Error archiving:", error);
+            alert("Erreur lors de l'archivage");
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Attention : Supprimer cet arrivage effacera toutes les données associées. Êtes-vous sûr ?")) return;
+        try {
+            await api.deleteArrivage(id);
+            fetchData();
+        } catch (error) {
+            console.error("Error deleting:", error);
+            alert("Erreur lors de la suppression");
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -137,34 +156,57 @@ export default function ArrivagesPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Coût Achat</p>
-                                        <p className="text-lg font-bold">{arrivage.cout_total.toLocaleString()} F</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Ventes (Recettes)</p>
-                                        <p className="text-lg font-bold text-blue-600">{stats.revenue.toLocaleString()} F</p>
-                                    </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Ventes (Recettes)</p>
+                                    <p className="text-lg font-bold text-blue-600">{stats.revenue.toLocaleString()} F</p>
                                 </div>
 
-                                <div className="pt-2 border-t">
+                                <div className="pt-2 border-t text-sm">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="text-sm font-medium">Bénéfice / Perte</span>
+                                        <span className="font-medium">Bénéfice / Perte</span>
                                         <span className={`font-bold ${isProfitable ? 'text-green-600' : 'text-red-500'}`}>
                                             {stats.profit > 0 ? '+' : ''}{stats.profit.toLocaleString()} F
                                         </span>
                                     </div>
                                     {/* Progress Bar */}
-                                    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                                    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden mb-2">
                                         <div
                                             className={`h-full ${isProfitable ? 'bg-green-500' : 'bg-yellow-500'}`}
                                             style={{ width: `${Math.min(stats.progress, 100)}%` }}
                                         />
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-1 text-right">
-                                        {stats.itemsSold} / {arrivage.nombre_articles_estimes} articles vendus (Clic pour détails)
-                                    </p>
+
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-xs text-muted-foreground">
+                                            {stats.itemsSold} / {arrivage.nombre_articles_estimes} vendus
+                                        </p>
+                                        <div className="flex gap-2">
+                                            {arrivage.statut === 'actif' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-6 text-xs"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleArchive(arrivage.id!);
+                                                    }}
+                                                >
+                                                    Archiver
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDelete(arrivage.id!);
+                                                }}
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -204,17 +246,10 @@ export default function ArrivagesPage() {
                 {selectedArrivage && (
                     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                         {/* 1. Global Stats */}
-                        <div className="grid grid-cols-3 gap-4 bg-muted/40 p-4 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4 bg-muted/40 p-4 rounded-lg">
                             <div className="text-center">
                                 <p className="text-xs text-muted-foreground uppercase">Coût Global</p>
                                 <p className="text-xl font-bold">{selectedArrivage.cout_total.toLocaleString()} F</p>
-                            </div>
-                            <div className="text-center border-l borber-r border-gray-200">
-                                <p className="text-xs text-muted-foreground uppercase">Coût Unitaire (Calc)</p>
-                                <p className="text-xl font-bold text-blue-600">
-                                    {Math.round(selectedArrivage.cout_total / selectedArrivage.nombre_articles_estimes).toLocaleString()} F
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">pour {selectedArrivage.nombre_articles_estimes} articles</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-xs text-muted-foreground uppercase">Résultat Actuel</p>
@@ -259,6 +294,6 @@ export default function ArrivagesPage() {
                     </div>
                 )}
             </Modal>
-        </div>
+        </div >
     );
 }

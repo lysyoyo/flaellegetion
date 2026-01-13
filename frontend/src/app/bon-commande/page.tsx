@@ -96,16 +96,16 @@ export default function BonCommandePage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center print:hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bon de Commande</h1>
           <p className="text-muted-foreground">Générez des bons de commande pour vos fournisseurs.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePrint}>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={handlePrint} className="flex-1 sm:flex-none">
             <Printer className="h-4 w-4 mr-2" /> Imprimer / PDF
           </Button>
-          <Button onClick={handleSendEmail} disabled={isSending}>
+          <Button onClick={handleSendEmail} disabled={isSending} className="flex-1 sm:flex-none">
             <Mail className="h-4 w-4 mr-2" /> Envoyer par Email
           </Button>
         </div>

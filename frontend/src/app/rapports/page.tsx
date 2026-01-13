@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { Vente, Achat } from '@/lib/types'; // Need to ensure these types exist or extend them
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/Card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -12,9 +10,12 @@ interface VenteWithDate extends Vente {
   produit_nom?: string;
 }
 
+import { api } from '@/lib/api';
+
 export default function RapportsPage() {
   const [ventes, setVentes] = useState<VenteWithDate[]>([]);
   const [achats, setAchats] = useState<Achat[]>([]);
+  const [arrivages, setArrivages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,14 +24,15 @@ export default function RapportsPage() {
 
   const fetchData = async () => {
     try {
-      const ventesSnap = await getDocs(query(collection(db, 'ventes'), orderBy('date', 'desc')));
-      const achatsSnap = await getDocs(query(collection(db, 'achats'), orderBy('date', 'desc')));
-
-      const ventesData = ventesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VenteWithDate[];
-      const achatsData = achatsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Achat[];
+      const [ventesData, achatsData, arrivagesData] = await Promise.all([
+        api.getVentes(),
+        api.getAchats(),
+        api.getArrivages()
+      ]);
 
       setVentes(ventesData);
       setAchats(achatsData);
+      setArrivages(arrivagesData);
     } catch (error) {
       console.error("Error fetching reports:", error);
     } finally {
@@ -40,7 +42,8 @@ export default function RapportsPage() {
 
   // Calculations
   const totalVentes = ventes.reduce((acc, v) => acc + v.prix_total, 0);
-  const totalAchats = achats.reduce((acc, a) => acc + a.prix_total, 0);
+  // Total Expenses = Restocking + Bulk Arrivals
+  const totalAchats = achats.reduce((acc, a) => acc + a.prix_total, 0) + arrivages.reduce((acc, a) => acc + a.cout_total, 0);
   const totalBenefice = ventes.reduce((acc, v) => acc + v.benefice, 0);
 
   // Group by Day for Chart
