@@ -20,7 +20,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     return (
-        <div className="min-h-screen bg-gray-50 lg:flex">
+        <div className="min-h-screen w-full bg-gray-50 lg:flex">
             {/* Mobile Header */}
             <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-30">
                 <div className="flex items-center gap-2 font-bold text-xl">
