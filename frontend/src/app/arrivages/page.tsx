@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 export default function ArrivagesPage() {
     const [arrivages, setArrivages] = useState<Arrivage[]>([]);
     const [ventes, setVentes] = useState<Vente[]>([]);
+    const [products, setProducts] = useState<any[]>([]); // Store all products
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -76,42 +77,28 @@ export default function ArrivagesPage() {
 
     // Helper to calculate stats for a single Arrivage
     const getArrivageStats = (arrivage: Arrivage) => {
-        // Filter sales linked to this Arrivage (assuming links exist)
-        // NOTE: If sales are not yet linked in DB, this will be 0. We need to link them in StockPage.
         const linkedVentes = ventes.filter(v => v.arrivage_id === arrivage.id);
-
-        // If not linked explicitly, we might need a manual way? 
-        // For now, let's assume strict linking is the goal.
-
         const revenue = linkedVentes.reduce((acc, v) => acc + v.prix_total, 0);
         const profit = revenue - arrivage.cout_total;
         const itemsSold = linkedVentes.reduce((acc, v) => acc + v.quantite, 0);
         const progress = (itemsSold / arrivage.nombre_articles_estimes) * 100;
-
         return { revenue, profit, itemsSold, progress };
     };
 
     // Detailed Bilan State
     const [selectedArrivage, setSelectedArrivage] = useState<Arrivage | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-    const [linkedProducts, setLinkedProducts] = useState<any[]>([]); // To store products fetched for details
+    const [linkedProducts, setLinkedProducts] = useState<any[]>([]);
 
-    // Fetch products linked to an arrivage when details are opened
-    const fetchLinkedProducts = async (arrivageId: string) => {
-        try {
-            const q = query(collection(db, 'produits'), where('arrivage_id', '==', arrivageId));
-            const snap = await getDocs(q);
-            const products = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setLinkedProducts(products);
-        } catch (error) {
-            console.error("Error fetching linked products", error);
-            setLinkedProducts([]);
-        }
+    // Filter products linked to an arrivage from local state
+    const updateLinkedProducts = (arrivageId: string) => {
+        const linked = products.filter(p => p.arrivage_id === arrivageId);
+        setLinkedProducts(linked);
     }
 
     const openDetails = (arrivage: Arrivage) => {
         setSelectedArrivage(arrivage);
-        fetchLinkedProducts(arrivage.id!); // Trigger fetch
+        updateLinkedProducts(arrivage.id!);
         setIsDetailsOpen(true);
     };
 
