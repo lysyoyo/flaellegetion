@@ -58,4 +58,9 @@ services:
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
         sync: false
+      # Admin SDK (Server-side only)
+      - key: PRIVATE_KEY
+        sync: false
+      - key: CLIENT_EMAIL
+        sync: false
     # Link to backend for build time if needed (Next.js client side calls use public URL)

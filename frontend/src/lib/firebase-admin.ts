@@ -2,11 +2,11 @@ import { initializeApp, getApps, cert, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const serviceAccount = {
-    projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    // Handle private key newlines for Vercel/Env
-    privateKey: process.env.FIREBASE_PRIVATE_KEY
-        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    projectId: process.env.NEXT_PUBLIC_PROJECT_ID || process.env.PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || process.env.CLIENT_EMAIL,
+    // Handle private key newlines for Vercel/Render/Env
+    privateKey: (process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY)
+        ? (process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY)?.replace(/\\n/g, '\n')
         : undefined,
 };
 
