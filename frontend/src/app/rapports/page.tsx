@@ -56,6 +56,10 @@ export default function RapportsPage() {
     const date = new Date(v.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
     if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
     chartMap[date].ventes += v.prix_total;
+    // Add sales transport cost to expenses for that day
+    if (v.cout_transport) {
+      chartMap[date].depenses += v.cout_transport;
+    }
   });
 
   achats.forEach(a => {
