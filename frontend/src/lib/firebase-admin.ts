@@ -28,32 +28,51 @@ const serviceAccount = {
 
 export function initAdmin() {
     if (getApps().length === 0) {
-        // Option 1: Env Var for Service Account File (e.g., Docker/Render with file)
-        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // Option 1: Env Var for Service Account File (e.g., Docker/Render with file path)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS.startsWith('{')) {
+            // It's a file path
             try {
-                // If it's a path, let's try to trust custom logic or just use cert(require(path)) if valid
-                // But generally firebase-admin auto-detects GOOGLE_APPLICATION_CREDENTIALS if we use applicationDefault()
-                // OR we can just do:
                 initializeApp({
                     credential: applicationDefault()
                 });
-                console.log("Firebase Admin Initialized with GOOGLE_APPLICATION_CREDENTIALS");
+                console.log("Firebase Admin Initialized with GOOGLE_APPLICATION_CREDENTIALS (File)");
                 return getApp();
             } catch (error) {
                 console.error("Failed to init with applicationDefault:", error);
-                // Fallthrough to manual env vars
             }
         }
 
-        // Option 2: Manual Env Vars (Vercel/Local without file)
+        // Option 2: Full JSON in Env Var (FIREBASE_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS content)
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
+            (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.GOOGLE_APPLICATION_CREDENTIALS.startsWith('{') ? process.env.GOOGLE_APPLICATION_CREDENTIALS : null);
+
+        if (serviceAccountJson) {
+            try {
+                const creds = JSON.parse(serviceAccountJson);
+                initializeApp({
+                    credential: cert(creds)
+                });
+                console.log("Firebase Admin Initialized with JSON Env Var");
+                return getApp();
+            } catch (e) {
+                console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
+                // Fallthrough to individual vars
+            }
+        }
+
+        // Option 3: Manual Env Vars (Individual fields)
         if (serviceAccount.projectId && serviceAccount.clientEmail && serviceAccount.privateKey) {
-            initializeApp({
-                credential: cert(serviceAccount),
-                // storageBucket: process.env.NEXT_PUBLIC_STORAGE_BUCKET
-            });
-            console.log("Firebase Admin Initialized with Env Vars");
+            try {
+                initializeApp({
+                    credential: cert(serviceAccount),
+                });
+                console.log("Firebase Admin Initialized with Individual Env Vars");
+            } catch (e) {
+                console.error("Failed to init with Individual Env Vars:", e);
+            }
         } else {
             console.warn("Missing Firebase Admin Env Vars. Backend operations may fail.");
+            console.warn("Checked: PROJECT_ID, CLIENT_EMAIL, PRIVATE_KEY");
         }
     }
     return getApp();

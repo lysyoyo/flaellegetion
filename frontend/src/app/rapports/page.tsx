@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Vente, Achat } from '@/lib/types'; // Need to ensure these types exist or extend them
+import { Vente, Achat } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/Card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, CreditCard } from 'lucide-react';
+import { Button } from '@/components/Button'; // Import Button properly
 
 interface VenteWithDate extends Vente {
   produit_nom?: string;
@@ -42,9 +43,6 @@ export default function RapportsPage() {
 
   // Calculations
   const totalVentes = ventes.reduce((acc, v) => acc + v.prix_total, 0);
-  // Total Expenses = Restocking + Bulk Arrivals (Cost + Transport) + Sales Logistics
-  // Actually, Sales Logistics reduce Benefit, they are not "Buying Expenses" strictly speaking, but they are "Expenses".
-  // Let's count them in Total Expenses for a global view.
   const totalAchats =
     achats.reduce((acc, a) => acc + a.prix_total, 0) +
     arrivages.reduce((acc, a) => acc + a.cout_total + (a.cout_transport || 0), 0) +
@@ -54,28 +52,24 @@ export default function RapportsPage() {
   // Group by Day for Chart (Sales vs Expenses)
   const chartMap: Record<string, { date: string; ventes: number; depenses: number }> = {};
 
-  // Process Sales
   ventes.forEach(v => {
     const date = new Date(v.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
     if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
     chartMap[date].ventes += v.prix_total;
   });
 
-  // Process Achats (Expenses)
   achats.forEach(a => {
     const date = new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
     if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
     chartMap[date].depenses += a.prix_total;
   });
 
-  // Process Arrivages (Expenses)
   arrivages.forEach(a => {
     const date = new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
     if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
-    chartMap[date].depenses += a.cout_total + (a.cout_transport || 0); // Include transport in daily expense
+    chartMap[date].depenses += a.cout_total + (a.cout_transport || 0);
   });
 
-  // Sort by Date (rudimentary Day/Month sort)
   const sortedChartData = Object.values(chartMap).sort((a, b) => {
     const [d1, m1] = a.date.split('/').map(Number);
     const [d2, m2] = b.date.split('/').map(Number);
@@ -91,7 +85,7 @@ export default function RapportsPage() {
 
   const sortedTopProducts = Object.entries(topProducts)
     .sort(([, a], [, b]) => b - a)
-    .slice(0, 7) // Top 7
+    .slice(0, 7)
     .map(([nom, quantite]) => ({ nom, quantite }));
 
   if (loading) return <div className="p-8">Calcul des rapports...</div>;
@@ -145,8 +139,6 @@ export default function RapportsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-
-        {/* Sales vs Expenses Chart */}
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Évolution : Ventes vs Dépenses</CardTitle>
@@ -172,7 +164,6 @@ export default function RapportsPage() {
           </CardContent>
         </Card>
 
-        {/* Top Products Chart (By Article) */}
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Ventes par Article (Top 7)</CardTitle>
@@ -185,7 +176,6 @@ export default function RapportsPage() {
                   <YAxis type="category" dataKey="nom" width={100} tick={{ fontSize: 12 }} />
                   <Tooltip cursor={{ fill: 'transparent' }} />
                   <Bar dataKey="quantite" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
-                    {/* Label on right of bar */}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -195,6 +185,30 @@ export default function RapportsPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="flex justify-end pt-8 border-t mt-8">
+        <Button
+          variant="destructive"
+          onClick={async () => {
+            if (confirm("ATTENTION: CELA VA EFFACER TOUT L'HISTORIQUE (STOCK, VENTES, ARRIVAGES, RAPPORTS). CETTE ACTION EST IRREVERSIBLE. Êtes-vous sûr ?")) {
+              try {
+                const res = await fetch('/api/reset', { method: 'DELETE' });
+                if (res.ok) {
+                  alert("Toutes les données ont été effacées. La page va se recharger.");
+                  window.location.reload();
+                } else {
+                  alert("Erreur lors de la réinitialisation.");
+                }
+              } catch (e) {
+                console.error(e);
+                alert("Erreur réseau.");
+              }
+            }
+          }}
+        >
+          Réinitialiser toutes les données (Factory Reset)
+        </Button>
       </div>
     </div>
   );
