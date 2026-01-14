@@ -24,6 +24,7 @@ export default function VenteAchatPage() {
   const [transportCost, setTransportCost] = useState<number | ''>(''); // Optional transport cost
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchProduits();
@@ -55,6 +56,8 @@ export default function VenteAchatPage() {
   const handleVente = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    if (isSubmitting) return; // Prevent double submit
+    setIsSubmitting(true);
     setStatus('idle');
 
     // Basic frontend validation
@@ -93,12 +96,16 @@ export default function VenteAchatPage() {
       console.error(error);
       setStatus('error');
       setStatusMessage(error.message || "Erreur lors de la vente.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAchat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    if (isSubmitting) return; // Prevent double submit
+    setIsSubmitting(true);
     setStatus('idle');
 
     const purchasePrice = customPrice !== '' ? Number(customPrice) : selectedProduct.prix_achat;
@@ -126,6 +133,8 @@ export default function VenteAchatPage() {
       console.error(error);
       setStatus('error');
       setStatusMessage(error.message || "Erreur lors de l'achat.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -278,8 +287,8 @@ export default function VenteAchatPage() {
                     </div>
                   )}
                 </div>
-                <Button size="lg" className="min-w-[150px]">
-                  {activeTab === 'vente' ? 'Valider Vente' : 'Valider Achat'}
+                <Button size="lg" className="min-w-[150px]" disabled={isSubmitting}>
+                  {isSubmitting ? 'Traitement...' : (activeTab === 'vente' ? 'Valider Vente' : 'Valider Achat')}
                 </Button>
               </div>
             )}

@@ -79,7 +79,8 @@ export default function ArrivagesPage() {
     const getArrivageStats = (arrivage: Arrivage) => {
         const linkedVentes = ventes.filter(v => v.arrivage_id === arrivage.id);
         const revenue = linkedVentes.reduce((acc, v) => acc + v.prix_total, 0);
-        const profit = revenue - arrivage.cout_total;
+        // Correct Profit = Revenue - (Cost + Transport)
+        const profit = revenue - (arrivage.cout_total + (arrivage.cout_transport || 0));
         const itemsSold = linkedVentes.reduce((acc, v) => acc + v.quantite, 0);
         const progress = (itemsSold / arrivage.nombre_articles_estimes) * 100;
         return { revenue, profit, itemsSold, progress };
