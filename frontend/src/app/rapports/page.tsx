@@ -42,32 +42,47 @@ export default function RapportsPage() {
 
   // Calculations
   const totalVentes = ventes.reduce((acc, v) => acc + v.prix_total, 0);
-  // Total Expenses = Restocking + Bulk Arrivals
-  const totalAchats = achats.reduce((acc, a) => acc + a.prix_total, 0) + arrivages.reduce((acc, a) => acc + a.cout_total, 0);
+  // Total Expenses = Restocking + Bulk Arrivals (Cost + Transport) + Sales Logistics
+  // Actually, Sales Logistics reduce Benefit, they are not "Buying Expenses" strictly speaking, but they are "Expenses".
+  // Let's count them in Total Expenses for a global view.
+  const totalAchats =
+    achats.reduce((acc, a) => acc + a.prix_total, 0) +
+    arrivages.reduce((acc, a) => acc + a.cout_total + (a.cout_transport || 0), 0) +
+    ventes.reduce((acc, v) => acc + (v.cout_transport || 0), 0);
   const totalBenefice = ventes.reduce((acc, v) => acc + v.benefice, 0);
 
-  // Group by Day for Chart
-  const salesByDay = ventes.reduce((acc, vente) => {
-    const date = new Date(vente.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    acc[date] = (acc[date] || 0) + vente.prix_total;
-    return acc;
-  }, {} as Record<string, number>);
+  // Group by Day for Chart (Sales vs Expenses)
+  const chartMap: Record<string, { date: string; ventes: number; depenses: number }> = {};
 
-  const chartData = Object.keys(salesByDay).map(date => ({
-    date,
-    amount: salesByDay[date]
-  })).reverse(); // Reverse if needed based on sort, but map order might be random. Sort by date proper?
-  // Actually since I fetched desc, the first ones are latest. I should reverse for chart (old -> new).
+  // Process Sales
+  ventes.forEach(v => {
+    const date = new Date(v.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
+    chartMap[date].ventes += v.prix_total;
+  });
 
-  // Let's sort keys properly
-  const sortedChartData = Object.entries(salesByDay).sort((a, b) => {
-    // rudimentary sort, assuming dd/mm works if year is same. 
-    // Better strictly:
-    return 0; // Skip strict sort for MVP, rely on insertion order if reasonable or just display.
-    // Actually, let's just take the last 7 days from the map.
-  }).map(([date, amount]) => ({ date, amount }));
+  // Process Achats (Expenses)
+  achats.forEach(a => {
+    const date = new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
+    chartMap[date].depenses += a.prix_total;
+  });
 
-  // Top Products
+  // Process Arrivages (Expenses)
+  arrivages.forEach(a => {
+    const date = new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    if (!chartMap[date]) chartMap[date] = { date, ventes: 0, depenses: 0 };
+    chartMap[date].depenses += a.cout_total + (a.cout_transport || 0); // Include transport in daily expense
+  });
+
+  // Sort by Date (rudimentary Day/Month sort)
+  const sortedChartData = Object.values(chartMap).sort((a, b) => {
+    const [d1, m1] = a.date.split('/').map(Number);
+    const [d2, m2] = b.date.split('/').map(Number);
+    return (m1 - m2) || (d1 - d2);
+  });
+
+  // Top Products Visualization
   const topProducts = ventes.reduce((acc, v) => {
     const name = v.produit_nom || 'Inconnu';
     acc[name] = (acc[name] || 0) + v.quantite;
@@ -76,7 +91,8 @@ export default function RapportsPage() {
 
   const sortedTopProducts = Object.entries(topProducts)
     .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
+    .slice(0, 7) // Top 7
+    .map(([nom, quantite]) => ({ nom, quantite }));
 
   if (loading) return <div className="p-8">Calcul des rapports...</div>;
 
@@ -122,16 +138,18 @@ export default function RapportsPage() {
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{totalAchats.toLocaleString()} FCFA</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
-              <TrendingDown className="h-3 w-3 mr-1 text-red-500" /> Coût des stocks
+              <TrendingDown className="h-3 w-3 mr-1 text-red-500" /> Coût Stocks + Logistique
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+
+        {/* Sales vs Expenses Chart */}
         <Card className="col-span-4">
           <CardHeader>
-            <CardTitle>Évolution des Ventes</CardTitle>
+            <CardTitle>Évolution : Ventes vs Dépenses</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[300px] w-full">
@@ -141,38 +159,40 @@ export default function RapportsPage() {
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value) => [`${Number(value).toLocaleString()} F`, 'Ventes']}
+                    formatter={(value, name) => [
+                      `${Number(value).toLocaleString()} F`,
+                      name === 'ventes' ? 'Ventes' : 'Dépenses'
+                    ]}
                   />
-                  <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ventes" fill="#22c55e" radius={[4, 4, 0, 0]} name="ventes" />
+                  <Bar dataKey="depenses" fill="#ef4444" radius={[4, 4, 0, 0]} name="depenses" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
+        {/* Top Products Chart (By Article) */}
         <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>Produits les plus vendus</CardTitle>
+            <CardTitle>Ventes par Article (Top 7)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {sortedTopProducts.map(([nom, quantite], i) => (
-                <div key={nom} className="flex items-center">
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">{i + 1}. {nom}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {quantite} unités vendues
-                    </p>
-                  </div>
-                  <div className="ml-auto font-medium">
-                    {/* Could show total sales value if calculated */}
-                  </div>
-                </div>
-              ))}
-              {sortedTopProducts.length === 0 && (
-                <p className="text-sm text-muted-foreground">Aucune vente enregistrée.</p>
-              )}
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={sortedTopProducts} margin={{ left: 10 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="nom" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip cursor={{ fill: 'transparent' }} />
+                  <Bar dataKey="quantite" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
+                    {/* Label on right of bar */}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
+            {sortedTopProducts.length === 0 && (
+              <p className="text-sm text-center text-muted-foreground mt-4">Aucune vente enregistrée.</p>
+            )}
           </CardContent>
         </Card>
       </div>

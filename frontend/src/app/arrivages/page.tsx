@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/Label';
 import { Modal } from '@/components/Modal';
 import { Badge } from '@/components/Badge';
-import { Plus, TrendingUp, TrendingDown, Package, DollarSign, Trash2 } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Package, DollarSign, Trash2, Truck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function ArrivagesPage() {
@@ -19,10 +19,12 @@ export default function ArrivagesPage() {
     const [products, setProducts] = useState<any[]>([]); // Store all products
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showTransport, setShowTransport] = useState(false); // Toggle for transport input
 
     const [formData, setFormData] = useState({
         nom: '',
         cout_total: '',
+        cout_transport: '', // New field
         nombre_articles_estimes: '',
         date: new Date().toISOString().split('T')[0]
     });
@@ -56,6 +58,7 @@ export default function ArrivagesPage() {
             await api.createArrivage({
                 nom: formData.nom,
                 cout_total: Number(formData.cout_total),
+                cout_transport: formData.cout_transport ? Number(formData.cout_transport) : 0, // Include optional transport
                 nombre_articles_estimes: Number(formData.nombre_articles_estimes),
                 date: formData.date,
                 statut: 'actif',
@@ -65,7 +68,7 @@ export default function ArrivagesPage() {
 
             fetchData();
             setIsModalOpen(false);
-            setFormData({ nom: '', cout_total: '', nombre_articles_estimes: '', date: new Date().toISOString().split('T')[0] });
+            setFormData({ nom: '', cout_total: '', cout_transport: '', nombre_articles_estimes: '', date: new Date().toISOString().split('T')[0] });
         } catch (error) {
             console.error("Error creating arrivage:", error);
             alert("Erreur lors de la création");
@@ -131,6 +134,45 @@ export default function ArrivagesPage() {
                 <Button onClick={() => setIsModalOpen(true)} className="gap-2">
                     <Plus className="h-4 w-4" /> Nouvel Arrivage
                 </Button>
+            </div>
+
+            {/* Global Stats Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Coût Total Transport (Arrivages)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-blue-500" />
+                            {arrivages.reduce((acc, a) => acc + (a.cout_transport || 0), 0).toLocaleString()} F
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Frais Logistique (Ventes)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-green-500" />
+                            {ventes.reduce((acc, v) => acc + (v.cout_transport || 0), 0).toLocaleString()} F
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Dépenses Logistiques</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-red-500">
+                            {(
+                                arrivages.reduce((acc, a) => acc + (a.cout_transport || 0), 0) +
+                                ventes.reduce((acc, v) => acc + (v.cout_transport || 0), 0)
+                            ).toLocaleString()} F
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -233,6 +275,32 @@ export default function ArrivagesPage() {
                             <Input type="number" required value={formData.nombre_articles_estimes} onChange={e => setFormData({ ...formData, nombre_articles_estimes: e.target.value })} />
                         </div>
                     </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="transportToggle"
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                checked={showTransport}
+                                onChange={(e) => setShowTransport(e.target.checked)}
+                            />
+                            <label htmlFor="transportToggle" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                As-tu ajouter le prix de transport pour ce ballon ?
+                            </label>
+                        </div>
+                        {showTransport && (
+                            <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <Label>Coût Transport (Optionnel)</Label>
+                                <Input
+                                    type="number"
+                                    value={formData.cout_transport}
+                                    onChange={e => setFormData({ ...formData, cout_transport: e.target.value })}
+                                    placeholder="Ex: 5000"
+                                />
+                            </div>
+                        )}
+                    </div>
                     <div className="space-y-2">
                         <Label>Date</Label>
                         <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
@@ -246,13 +314,17 @@ export default function ArrivagesPage() {
                 {selectedArrivage && (
                     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                         {/* 1. Global Stats */}
-                        <div className="grid grid-cols-2 gap-4 bg-muted/40 p-4 rounded-lg">
+                        <div className="grid grid-cols-3 gap-4 bg-muted/40 p-4 rounded-lg">
                             <div className="text-center">
-                                <p className="text-xs text-muted-foreground uppercase">Coût Global</p>
-                                <p className="text-xl font-bold">{selectedArrivage.cout_total.toLocaleString()} F</p>
+                                <p className="text-xs text-muted-foreground uppercase">Coût Balle</p>
+                                <p className="text-lg font-bold">{selectedArrivage.cout_total.toLocaleString()} F</p>
+                            </div>
+                            <div className="text-center border-l border-r border-gray-200 px-2">
+                                <p className="text-xs text-muted-foreground uppercase">Coût Transport</p>
+                                <p className="text-lg font-bold">{(selectedArrivage.cout_transport || 0).toLocaleString()} F</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-xs text-muted-foreground uppercase">Résultat Actuel</p>
+                                <p className="text-xs text-muted-foreground uppercase">Résultat Net</p>
                                 <p className={`text-xl font-bold ${getArrivageStats(selectedArrivage).profit > 0 ? 'text-green-600' : 'text-red-500'}`}>
                                     {getArrivageStats(selectedArrivage).profit.toLocaleString()} F
                                 </p>

@@ -21,6 +21,7 @@ export default function VenteAchatPage() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number | ''>(''); // For purchases primarily
+  const [transportCost, setTransportCost] = useState<number | ''>(''); // Optional transport cost
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
@@ -46,6 +47,7 @@ export default function VenteAchatPage() {
     setSelectedProductId('');
     setQuantity(1);
     setCustomPrice('');
+    setTransportCost('');
     setStatus('idle');
     setStatusMessage('');
   };
@@ -64,7 +66,9 @@ export default function VenteAchatPage() {
 
     try {
       const totalPrix = selectedProduct.prix_vente * quantity;
-      const benefice = (selectedProduct.prix_vente - selectedProduct.prix_achat) * quantity;
+      // Benefice = (Selling Price - Buying Price) * Qty - Transport Cost (if any)
+      const costOfTransport = transportCost === '' ? 0 : Number(transportCost);
+      const benefice = ((selectedProduct.prix_vente - selectedProduct.prix_achat) * quantity) - costOfTransport;
 
       await api.recordVente({
         produit_id: selectedProduct.id,
@@ -72,6 +76,7 @@ export default function VenteAchatPage() {
         quantite: quantity,
         prix_unitaire: selectedProduct.prix_vente,
         prix_total: totalPrix,
+        cout_transport: costOfTransport,
         benefice: benefice,
         arrivage_id: selectedProduct.arrivage_id
       });
@@ -82,6 +87,7 @@ export default function VenteAchatPage() {
       // Refresh data
       fetchProduits();
       setQuantity(1);
+      setTransportCost('');
 
     } catch (error: any) {
       console.error(error);
@@ -106,9 +112,7 @@ export default function VenteAchatPage() {
         quantite: quantity,
         prix_unitaire: purchasePrice,
         prix_total: totalPrix,
-        arrivage_id: selectedProduct.arrivage_id // Optional, but usually purchases create NEW stock, maybe new arrival? 
-        // For 'Replenishment' of existing product, we might not link to a specific arrival unless selected. 
-        // But let's keep it simple.
+        arrivage_id: selectedProduct.arrivage_id // Optional
       });
 
       setStatus('success');
@@ -226,6 +230,20 @@ export default function VenteAchatPage() {
                       required
                     />
                   </div>
+
+                  {activeTab === 'vente' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="transportCost">Frais de Transport / Logistique (Optionnel)</Label>
+                      <Input
+                        id="transportCost"
+                        type="number"
+                        min="0"
+                        value={transportCost}
+                        onChange={(e) => setTransportCost(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="Ex: Frais de livraison"
+                      />
+                    </div>
+                  )}
 
                   {activeTab === 'achat' && (
                     <div className="space-y-2">

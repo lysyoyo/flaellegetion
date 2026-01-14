@@ -5,7 +5,10 @@ services:
     build: ./frontend
     ports:
       - "3000:3000"
+    volumes:
+      - ./backend/flaellegetion-firebase-adminsdk-fbsvc-248b71a430.json:/app/service-account.json:ro
     environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
       - NEXT_PUBLIC_API_KEY=${NEXT_PUBLIC_API_KEY}
       - NEXT_PUBLIC_AUTH_DOMAIN=${NEXT_PUBLIC_AUTH_DOMAIN}
       - NEXT_PUBLIC_PROJECT_ID=${NEXT_PUBLIC_PROJECT_ID}
@@ -16,3 +19,23 @@ services:
       - NEXT_PUBLIC_EMAILJS_SERVICE_ID=${NEXT_PUBLIC_EMAILJS_SERVICE_ID}
       - NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=${NEXT_PUBLIC_EMAILJS_TEMPLATE_ID}
       - NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=${NEXT_PUBLIC_EMAILJS_PUBLIC_KEY}
+      - FIREBASE_PRIVATE_KEY=${PRIVATE_KEY}
+      - FIREBASE_CLIENT_EMAIL=${CLIENT_EMAIL}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - CLIENT_EMAIL=${CLIENT_EMAIL}
+      - PROJECT_ID=${PROJECT_ID}
+      - PRIVATE_KEY_ID=${PRIVATE_KEY_ID}
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_X509_CERT_URL=${CLIENT_X509_CERT_URL}
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - CLIENT_EMAIL=${CLIENT_EMAIL}
+      - PROJECT_ID=${PROJECT_ID}
+      - PRIVATE_KEY_ID=${PRIVATE_KEY_ID}
+      - CLIENT_ID=${CLIENT_ID}
+      - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_STORAGE_BUCKET}

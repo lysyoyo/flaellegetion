@@ -13,8 +13,9 @@ export interface Arrivage {
   nom: string; // e.g., "Balle Robes Janvier"
   date: string;
   cout_total: number; // Cost of the bale/shipment
+  cout_transport?: number; // Optional transport/logistics cost
   nombre_articles_estimes: number; // e.g., 100 items
-  statut: 'actif' | 'cloture';
+  statut: 'actif' | 'cloture' | 'archivé';
   created_at?: any;
 }
 
@@ -25,6 +26,7 @@ export interface Vente {
   quantite: number;
   prix_unitaire?: number;
   prix_total: number;
+  cout_transport?: number; // Optional delivery cost
   benefice: number;
   date: string;
   created_at?: any;

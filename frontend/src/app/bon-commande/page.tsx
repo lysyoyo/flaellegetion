@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { api } from '@/lib/api';
 import { Produit } from '@/lib/types';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -24,8 +23,12 @@ export default function BonCommandePage() {
 
   useEffect(() => {
     const fetchProduits = async () => {
-      const querySnapshot = await getDocs(collection(db, 'produits'));
-      setProduits(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Produit)));
+      try {
+        const data = await api.getProducts();
+        setProduits(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      }
     };
     fetchProduits();
   }, []);
