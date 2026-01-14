@@ -77,9 +77,10 @@ export default function StockPage() {
   const getArrivageStats = (arrivage: Arrivage) => {
     const linkedVentes = ventes.filter(v => v.arrivage_id === arrivage.id);
     const revenue = linkedVentes.reduce((acc, v) => acc + v.prix_total, 0);
-    const totalExpenses = arrivage.cout_total + (arrivage.cout_transport || 0);
+    const salesTransport = linkedVentes.reduce((acc, v) => acc + (v.cout_transport || 0), 0);
+    const totalExpenses = arrivage.cout_total + (arrivage.cout_transport || 0) + salesTransport;
     const profit = revenue - totalExpenses;
-    return { revenue, profit, totalExpenses };
+    return { revenue, profit, totalExpenses, salesTransport };
   };
 
   const getGlobalStats = () => {
@@ -300,14 +301,22 @@ export default function StockPage() {
                 {isExpanded && (
                   <div className="border-t animate-in slide-in-from-top-2 duration-200">
                     {/* Detailed Stats Row inside */}
-                    <div className="grid grid-cols-3 gap-4 p-4 bg-muted/20 text-center border-b">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted/20 text-center border-b">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Chiffre d'Affaires</p>
-                        <p className="text-lg font-bold text-green-600">{stats.revenue.toLocaleString()} F</p>
+                        <p className="text-xs text-muted-foreground uppercase">Coût Balle</p>
+                        <p className="text-sm font-bold text-gray-700">{arrivage.cout_total.toLocaleString()} F</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Dépenses (Total)</p>
-                        <p className="text-lg font-bold text-red-500">{stats.totalExpenses.toLocaleString()} F</p>
+                        <p className="text-xs text-muted-foreground uppercase">Transp. Balle</p>
+                        <p className="text-sm font-bold text-gray-700">{(arrivage.cout_transport || 0).toLocaleString()} F</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Transp. Ventes</p>
+                        <p className="text-sm font-bold text-orange-600">{stats.salesTransport.toLocaleString()} F</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Total Revenus</p>
+                        <p className="text-lg font-bold text-green-600">{stats.revenue.toLocaleString()} F</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground uppercase">Bénéfice Net</p>
@@ -484,28 +493,55 @@ export default function StockPage() {
 
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="arrivage">Arrivage / Balle (Source)</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={formData.arrivage_id || ''}
-              onChange={(e) => {
-                const selectedId = e.target.value;
-                const selectedArrivage = arrivages.find(a => a.id === selectedId);
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="arrivage">Arrivage / Balle (Source)</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={formData.arrivage_id || ''}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selectedArrivage = arrivages.find(a => a.id === selectedId);
 
-                setFormData({
-                  ...formData,
-                  arrivage_id: selectedId
-                });
-              }}
-            >
-              <option value="">-- Aucun / Stock Ancien --</option>
-              {arrivages.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.nom} (Source)
-                </option>
-              ))}
-            </select>
+                  let calculatedUnitCost = 0;
+                  if (selectedArrivage && selectedArrivage.nombre_articles_estimes > 0) {
+                    calculatedUnitCost = Math.round((selectedArrivage.cout_total + (selectedArrivage.cout_transport || 0)) / selectedArrivage.nombre_articles_estimes);
+                  }
+
+                  setFormData({
+                    ...formData,
+                    arrivage_id: selectedId,
+                    prix_achat: calculatedUnitCost // Auto-fill Unit Cost
+                  });
+                }}
+              >
+                <option value="">-- Aucun / Stock Ancien --</option>
+                {arrivages.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.nom} (Source)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="prix_achat">Coût Unitaire (Calculé via Balle)</Label>
+              <div className="relative">
+                <Input
+                  id="prix_achat"
+                  type="number"
+                  value={formData.prix_achat === 0 ? '' : formData.prix_achat}
+                  onChange={(e) => setFormData({ ...formData, prix_achat: Number(e.target.value) })}
+                  className="pl-8 bg-gray-50 font-medium"
+                />
+                <span className="absolute left-3 top-2.5 text-gray-500 text-xs">F</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {(formData.arrivage_id)
+                  ? "Ce prix est calculé automatiquement : (Prix Balle + Transport) / Nombre Articles."
+                  : "Prix d'achat unitaire (si hors arrivage)."}
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

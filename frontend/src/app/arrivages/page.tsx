@@ -79,11 +79,12 @@ export default function ArrivagesPage() {
     const getArrivageStats = (arrivage: Arrivage) => {
         const linkedVentes = ventes.filter(v => v.arrivage_id === arrivage.id);
         const revenue = linkedVentes.reduce((acc, v) => acc + v.prix_total, 0);
-        // Correct Profit = Revenue - (Cost + Transport)
-        const profit = revenue - (arrivage.cout_total + (arrivage.cout_transport || 0));
+        const salesTransport = linkedVentes.reduce((acc, v) => acc + (v.cout_transport || 0), 0);
+        // Correct Profit = Revenue - (Cost + Transport Balle + Transport Ventes)
+        const profit = revenue - (arrivage.cout_total + (arrivage.cout_transport || 0) + salesTransport);
         const itemsSold = linkedVentes.reduce((acc, v) => acc + v.quantite, 0);
         const progress = (itemsSold / arrivage.nombre_articles_estimes) * 100;
-        return { revenue, profit, itemsSold, progress };
+        return { revenue, profit, itemsSold, progress, salesTransport };
     };
 
     // Detailed Bilan State
@@ -315,16 +316,20 @@ export default function ArrivagesPage() {
                 {selectedArrivage && (
                     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                         {/* 1. Global Stats */}
-                        <div className="grid grid-cols-3 gap-4 bg-muted/40 p-4 rounded-lg">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/40 p-4 rounded-lg">
                             <div className="text-center">
                                 <p className="text-xs text-muted-foreground uppercase">Coût Balle</p>
                                 <p className="text-lg font-bold">{selectedArrivage.cout_total.toLocaleString()} F</p>
                             </div>
-                            <div className="text-center border-l border-r border-gray-200 px-2">
-                                <p className="text-xs text-muted-foreground uppercase">Coût Transport</p>
+                            <div className="text-center border-l border-gray-200 pl-2">
+                                <p className="text-xs text-muted-foreground uppercase">Trsp. Balle</p>
                                 <p className="text-lg font-bold">{(selectedArrivage.cout_transport || 0).toLocaleString()} F</p>
                             </div>
-                            <div className="text-center">
+                            <div className="text-center border-l border-gray-200 pl-2">
+                                <p className="text-xs text-muted-foreground uppercase">Trsp. Ventes</p>
+                                <p className="text-lg font-bold text-orange-600">{getArrivageStats(selectedArrivage).salesTransport.toLocaleString()} F</p>
+                            </div>
+                            <div className="text-center border-l border-gray-200 pl-2">
                                 <p className="text-xs text-muted-foreground uppercase">Résultat Net</p>
                                 <p className={`text-xl font-bold ${getArrivageStats(selectedArrivage).profit > 0 ? 'text-green-600' : 'text-red-500'}`}>
                                     {getArrivageStats(selectedArrivage).profit.toLocaleString()} F
