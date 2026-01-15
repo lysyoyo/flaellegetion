@@ -9,7 +9,7 @@ import { Button } from './Button';
 
 const navigation = [
     { name: 'Stock', href: '/stock', icon: Package },
-    { name: 'Arrivages / Balles', href: '/arrivages', icon: Box }, // New Link
+    { name: 'Arrivages', href: '/arrivages', icon: Box }, // New Link
     { name: 'Vente / Achat', href: '/vente-achat', icon: ShoppingCart },
     { name: 'Rapports', href: '/rapports', icon: FileText },
     { name: 'Bon de commande', href: '/bon-commande', icon: FileSpreadsheet },
@@ -18,6 +18,17 @@ const navigation = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
+
+    // Hide sidebar layout on login page
+    if (pathname === '/login') {
+        return (
+            <div className="min-h-screen w-full bg-gray-100 flex items-center justify-center">
+                <div className="w-full">
+                    {children}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen w-full bg-gray-50 lg:flex">

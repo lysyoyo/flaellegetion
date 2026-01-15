@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/Card';
-import { Lock, User, LogIn } from 'lucide-react';
+import { Lock, User, LogIn, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -35,10 +36,17 @@ export default function LoginPage() {
                 router.push('/stock');
                 router.refresh();
             } else {
-                setError(data.message || 'Identifiants incorrects');
+                const message = data.message || 'Identifiants incorrects';
+                if (message.includes('password') || message.toLowerCase().includes('mot de passe')) {
+                    setError('Mot de passe incorrect.');
+                } else if (message.includes('user') || message.toLowerCase().includes('utilisateur')) {
+                    setError("Nom d'utilisateur introuvable.");
+                } else {
+                    setError(message);
+                }
             }
         } catch (err) {
-            setError("Erreur de connexion");
+            setError("Erreur de connexion au serveur.");
         } finally {
             setLoading(false);
         }
@@ -73,24 +81,40 @@ export default function LoginPage() {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                                 <Input
-                                    className="pl-10"
-                                    type="password"
+                                    className="pl-10 pr-10"
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="Mot de passe"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-5 w-5" />
+                                    ) : (
+                                        <Eye className="h-5 w-5" />
+                                    )}
+                                </button>
                             </div>
                         </div>
 
                         {error && (
-                            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md text-center border border-red-200">
-                                {error}
+                            <div className="p-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-md border border-red-200 animate-in slide-in-from-top-1 fade-in duration-300">
+                                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                                <span>{error}</span>
                             </div>
                         )}
 
                         <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                            {loading ? 'Vérification...' : (
+                            {loading ? (
+                                <span className="flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Connexion...
+                                </span>
+                            ) : (
                                 <span className="flex items-center gap-2">
                                     <LogIn className="h-4 w-4" /> Se connecter
                                 </span>

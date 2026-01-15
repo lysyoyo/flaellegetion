@@ -12,6 +12,8 @@ import { Modal } from '@/components/Modal';
 import { Badge } from '@/components/Badge';
 import { Plus, TrendingUp, TrendingDown, Package, DollarSign, Trash2, Truck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { db } from '@/lib/firebase'; // Added db import
+import { writeBatch, doc } from 'firebase/firestore'; // Added specific firestore imports
 
 export default function ArrivagesPage() {
     const [arrivages, setArrivages] = useState<Arrivage[]>([]);
@@ -123,6 +125,80 @@ export default function ArrivagesPage() {
         } catch (error) {
             console.error("Error deleting:", error);
             alert("Erreur lors de la suppression");
+        }
+    };
+
+    const handleDistributeCosts = async (arrivage: Arrivage) => {
+        if (!confirm("Attention : Cette action va recalculer le 'Coût Réel' de TOUS les produits de cet arrivage en fonction de leur 'Prix Fournisseur' et du coût total de l'arrivage. Voulez-vous continuer ?")) return;
+
+        try {
+            setLoading(true);
+
+            // 1. Get all linked products (fresh fetch recommended, but using local is faster for now - assumming syncing)
+            // Let's rely on 'linkedProducts' which is set when opening details.
+            if (linkedProducts.length === 0) {
+                alert("Aucun produit lié à cet arrivage.");
+                setLoading(false);
+                return;
+            }
+
+            // 2. Calculate Total Supplier Value
+            const totalSupplierValue = linkedProducts.reduce((acc, p) => acc + (p.prix_fournisseur || 0), 0);
+
+            if (totalSupplierValue === 0) {
+                alert("Erreur : Le total des 'Prix Fournisseur' est de 0. Veuillez renseigner le prix fournisseur pour les articles.");
+                setLoading(false);
+                return;
+            }
+
+            // 3. Calculate Coefficient
+            if (totalSupplierValue === 0) {
+                alert("Erreur : Le 'Prix Fournisseur' total est 0. Impossible de calculer le coefficient. Veuillez assigner des prix fournisseurs estimés aux produits.");
+                setLoading(false);
+                return;
+            }
+
+            // Real Total Cost = Cost of Bale + Transport of Bale
+            const realTotalCost = arrivage.cout_total + (arrivage.cout_transport || 0);
+            const coefficient = realTotalCost / totalSupplierValue;
+
+            console.log(`Distribution: Cost=${realTotalCost}, SupplierTotal=${totalSupplierValue}, Coeff=${coefficient}`);
+
+            // 4. Batch Update
+            const batch = writeBatch(db);
+            let updatedCount = 0;
+
+            linkedProducts.forEach(product => {
+                if (product.id) {
+                    const productRef = doc(db, 'produits', product.id);
+                    const newRealCost = Math.round((product.prix_fournisseur || 0) * coefficient);
+
+                    batch.update(productRef, {
+                        prix_achat: newRealCost
+                    });
+                    updatedCount++;
+                }
+            });
+
+            // Save coefficient to Arrivage
+            if (arrivage.id) {
+                const arrivageRef = doc(db, 'arrivages', arrivage.id);
+                batch.update(arrivageRef, { coefficient: parseFloat(coefficient.toFixed(4)) });
+            }
+
+            await batch.commit();
+
+            alert(`Succès ! Coûts mis à jour pour ${updatedCount} articles.\nCoefficient appliqué : ${coefficient.toFixed(3)}`);
+
+            // 5. Refresh Data
+            fetchData();
+            setIsDetailsOpen(false);
+
+        } catch (error) {
+            console.error("Error distributing costs:", error);
+            alert("Erreur lors de la répartition des coûts.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -264,7 +340,7 @@ export default function ArrivagesPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Same form content logic repeated or extracted? I'll repeat for safety/speed since I am replacing the block */}
                     <div className="space-y-2">
-                        <Label>Nom de l'arrivage / Balle</Label>
+                        <Label>Nom de l'arrivage</Label>
                         <Input required value={formData.nom} onChange={e => setFormData({ ...formData, nom: e.target.value })} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -318,16 +394,23 @@ export default function ArrivagesPage() {
                         {/* 1. Global Stats */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/40 p-4 rounded-lg">
                             <div className="text-center">
-                                <p className="text-xs text-muted-foreground uppercase">Coût Balle</p>
+                                <p className="text-xs text-muted-foreground uppercase">Coût Arrivage</p>
                                 <p className="text-lg font-bold">{selectedArrivage.cout_total.toLocaleString()} F</p>
                             </div>
                             <div className="text-center border-l border-gray-200 pl-2">
-                                <p className="text-xs text-muted-foreground uppercase">Trsp. Balle</p>
-                                <p className="text-lg font-bold">{(selectedArrivage.cout_transport || 0).toLocaleString()} F</p>
+                                <p className="text-xs text-muted-foreground uppercase">Transp. Arrivage</p>
+                                <p className="text-sm text-muted-foreground">Transport: {(selectedArrivage.cout_transport || 0).toLocaleString()} F</p>
+                                {selectedArrivage.coefficient && (
+                                    <p className="text-sm font-bold text-purple-600">Coefficient: {selectedArrivage.coefficient.toFixed(3)}</p>
+                                )}
                             </div>
                             <div className="text-center border-l border-gray-200 pl-2">
-                                <p className="text-xs text-muted-foreground uppercase">Trsp. Ventes</p>
-                                <p className="text-lg font-bold text-orange-600">{getArrivageStats(selectedArrivage).salesTransport.toLocaleString()} F</p>
+                                <p className="text-xs text-muted-foreground uppercase">Coeff. Répartition</p>
+                                <p className="text-lg font-bold text-purple-600">
+                                    {(linkedProducts.reduce((acc, p) => acc + (p.prix_fournisseur || 0), 0) > 0)
+                                        ? ((selectedArrivage.cout_total + (selectedArrivage.cout_transport || 0)) / linkedProducts.reduce((acc, p) => acc + (p.prix_fournisseur || 0), 0)).toFixed(2)
+                                        : '-'}
+                                </p>
                             </div>
                             <div className="text-center border-l border-gray-200 pl-2">
                                 <p className="text-xs text-muted-foreground uppercase">Résultat Net</p>
@@ -337,10 +420,26 @@ export default function ArrivagesPage() {
                             </div>
                         </div>
 
+                        {/* ACTION: Distribute Costs */}
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div>
+                                <h4 className="font-bold text-blue-900">Répartition des Coûts</h4>
+                                <p className="text-sm text-blue-700">
+                                    Total Prix Fournisseur : <span className="font-bold">{linkedProducts.reduce((acc, p) => acc + (p.prix_fournisseur || 0), 0).toLocaleString()} F</span>
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                    Cliquez pour recalculer le coût réel de chaque article basé sur son prix fournisseur.
+                                </p>
+                            </div>
+                            <Button onClick={() => handleDistributeCosts(selectedArrivage)} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+                                Recalculer & Appliquer
+                            </Button>
+                        </div>
+
                         {/* 2. Product List Breakdown */}
                         <div>
                             <h3 className="font-semibold mb-3 flex items-center gap-2">
-                                <Package className="h-4 w-4" /> Habits enregistrés dans cet arrivage
+                                <Package className="h-4 w-4" /> Habits enregistrés ({linkedProducts.length})
                             </h3>
                             {linkedProducts.length === 0 ? (
                                 <p className="text-sm text-muted-foreground italic">Aucun produit enregistré pour cet arrivage.</p>
@@ -354,14 +453,16 @@ export default function ArrivagesPage() {
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-sm">{prod.nom}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Prix Vente Fixé: <span className="text-primary font-semibold">{prod.prix_vente.toLocaleString()} F</span>
-                                                    </p>
+                                                    <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                                                        <span>Prix Fourn: <b className="text-gray-700">{(prod.prix_fournisseur || 0).toLocaleString()}</b></span>
+                                                        <span>Coût Réel: <b className="text-blue-600">{prod.prix_achat.toLocaleString()}</b></span>
+                                                        <span>Vente: <b className="text-green-600">{prod.prix_vente.toLocaleString()}</b></span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <Badge variant={prod.quantite > 0 ? 'outline' : 'secondary'}>
-                                                    {prod.quantite > 0 ? `Reste: ${prod.quantite}` : 'ÉPUISÉ'}
+                                                    {prod.quantite > 0 ? `Qté: ${prod.quantite}` : 'ÉPUISÉ'}
                                                 </Badge>
                                             </div>
                                         </div>

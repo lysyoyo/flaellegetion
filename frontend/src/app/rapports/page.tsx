@@ -17,6 +17,7 @@ export default function RapportsPage() {
   const [ventes, setVentes] = useState<VenteWithDate[]>([]);
   const [achats, setAchats] = useState<Achat[]>([]);
   const [arrivages, setArrivages] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]); // Added products state
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,15 +26,17 @@ export default function RapportsPage() {
 
   const fetchData = async () => {
     try {
-      const [ventesData, achatsData, arrivagesData] = await Promise.all([
+      const [ventesData, achatsData, arrivagesData, productsData] = await Promise.all([
         api.getVentes(),
         api.getAchats(),
-        api.getArrivages()
+        api.getArrivages(),
+        api.getProducts() // Fetch products
       ]);
 
       setVentes(ventesData);
       setAchats(achatsData);
       setArrivages(arrivagesData);
+      setProducts(productsData);
     } catch (error) {
       console.error("Error fetching reports:", error);
     } finally {
@@ -47,7 +50,20 @@ export default function RapportsPage() {
     achats.reduce((acc, a) => acc + a.prix_total, 0) +
     arrivages.reduce((acc, a) => acc + a.cout_total + (a.cout_transport || 0), 0) +
     ventes.reduce((acc, v) => acc + (v.cout_transport || 0), 0);
-  const totalBenefice = ventes.reduce((acc, v) => acc + v.benefice, 0);
+
+  // Recalculate Profit dynamically using latest product costs
+  const totalBenefice = ventes.reduce((acc, v) => {
+    const product = products.find(p => p.id === v.produit_id);
+    // If product exists, use its CURRENT real cost. If not, fallback to stored benefice (risky but necessary for deleted products)
+    // Note: v.benefice stored in DB might be stale.
+    // Logic: Profit = Sales Price - (Real Cost * Qty) - Transport
+    if (product) {
+      const realCost = product.prix_achat || 0;
+      const profit = v.prix_total - (realCost * v.quantite) - (v.cout_transport || 0);
+      return acc + profit;
+    }
+    return acc + v.benefice;
+  }, 0);
 
   // Group by Day for Chart (Sales vs Expenses)
   const chartMap: Record<string, { date: string; ventes: number; depenses: number }> = {};
@@ -103,12 +119,12 @@ export default function RapportsPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-sm font-medium">Chiffre d'Affaires</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalVentes.toLocaleString()} FCFA</div>
+          <CardContent className="pb-3">
+            <div className="text-lg font-bold">{totalVentes.toLocaleString()} FCFA</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <TrendingUp className="h-3 w-3 mr-1 text-green-500" /> Total revenus
             </p>
@@ -116,12 +132,12 @@ export default function RapportsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-sm font-medium">Bénéfice Net</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalBenefice.toLocaleString()} FCFA</div>
+          <CardContent className="pb-3">
+            <div className="text-lg font-bold text-green-600">{totalBenefice.toLocaleString()} FCFA</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               Marge réelle sur ventes
             </p>
@@ -129,12 +145,12 @@ export default function RapportsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-sm font-medium">Dépenses Totales</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{totalAchats.toLocaleString()} FCFA</div>
+          <CardContent className="pb-3">
+            <div className="text-lg font-bold text-red-600">{totalAchats.toLocaleString()} FCFA</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <TrendingDown className="h-3 w-3 mr-1 text-red-500" /> Coût Stocks + Logistique
             </p>

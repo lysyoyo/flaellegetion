@@ -59,7 +59,10 @@ export default function BonCommandePage() {
     ));
   };
 
-  const totalOrder = orderItems.reduce((acc, item) => acc + (item.prix_achat * item.orderQty), 0);
+  // Calculate Total based on Supplier Price (if available) or Cost
+  const getItemPrice = (item: OrderItem) => item.prix_fournisseur || item.prix_achat;
+
+  const totalOrder = orderItems.reduce((acc, item) => acc + (getItemPrice(item) * item.orderQty), 0);
 
   const handlePrint = () => {
     window.print();
@@ -83,7 +86,7 @@ export default function BonCommandePage() {
       const templateParams = {
         date: new Date().toLocaleDateString('fr-FR'),
         total_amount: totalOrder.toLocaleString(),
-        order_items: orderItems.map(item => `${item.nom} (x${item.orderQty}) - ${(item.prix_achat * item.orderQty).toLocaleString()} F`).join('\n')
+        order_items: orderItems.map(item => `${item.nom} (x${item.orderQty}) - ${(getItemPrice(item) * item.orderQty).toLocaleString()} F`).join('\n')
       };
 
       await emailjs.send(serviceId, templateId, templateParams, publicKey);
@@ -162,7 +165,7 @@ export default function BonCommandePage() {
               <Table className="mb-8">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">Image</TableHead>
+                    <TableHead className="w-[100px] text-center">Img / #</TableHead>
                     <TableHead>Désignation</TableHead>
                     <TableHead className="text-right">Prix Unitaire</TableHead>
                     <TableHead className="text-right">Quantité</TableHead>
@@ -171,17 +174,30 @@ export default function BonCommandePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orderItems.map((item) => (
+                  {orderItems.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell>
-                        <img
-                          src={item.image_url}
-                          className="h-10 w-10 object-cover"
-                          onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/40")}
-                        />
+                      <TableCell className="text-center">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            className="h-10 w-10 object-cover mx-auto rounded-md shadow-sm"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        ) : (
+                          <span className="font-bold text-gray-400 text-lg">#{index + 1}</span>
+                        )}
                       </TableCell>
-                      <TableCell className="font-medium">{item.nom}</TableCell>
-                      <TableCell className="text-right">{item.prix_achat.toLocaleString()} F</TableCell>
+                      <TableCell className="font-medium">
+                        {item.nom}
+                        <div className="text-xs text-muted-foreground hidden print:block">
+                          Ref: {item.id?.substring(0, 6).toUpperCase()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {(item.prix_fournisseur || item.prix_achat).toLocaleString()} F
+                        {/* Hint if using fallback price */}
+                        {(!item.prix_fournisseur) && <span className="ml-1 text-[10px] text-muted-foreground print:hidden">(coût)</span>}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Input
                           type="number"
@@ -192,7 +208,7 @@ export default function BonCommandePage() {
                         />
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        {(item.prix_achat * item.orderQty).toLocaleString()} F
+                        {(getItemPrice(item) * item.orderQty).toLocaleString()} F
                       </TableCell>
                       <TableCell className="print:hidden">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => removeFromOrder(item.id!)}>

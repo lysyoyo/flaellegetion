@@ -3,6 +3,7 @@ export interface Produit {
   nom: string;
   prix_achat: number;
   prix_vente: number;
+  prix_fournisseur?: number; // Price from supplier list (used for weighted distribution)
   quantite: number;
   image_url: string;
   arrivage_id?: string; // Link to the arrival batch
@@ -16,6 +17,7 @@ export interface Arrivage {
   cout_transport?: number; // Optional transport/logistics cost
   nombre_articles_estimes: number; // e.g., 100 items
   statut: 'actif' | 'cloture' | 'archivé';
+  coefficient?: number; // Calculated distribution coefficient
   created_at?: any;
 }
 
