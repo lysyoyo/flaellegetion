@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingCart, FileText, FileSpreadsheet, Menu, X, Box } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, FileText, FileSpreadsheet, Menu, X, Box, HelpCircle } from 'lucide-react'; // Added HelpCircle
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
 
 const navigation = [
     { name: 'Stock', href: '/stock', icon: Package },
-    { name: 'Arrivages', href: '/arrivages', icon: Box }, // New Link
+    { name: 'Arrivages', href: '/arrivages', icon: Box },
     { name: 'Vente / Achat', href: '/vente-achat', icon: ShoppingCart },
     { name: 'Rapports', href: '/rapports', icon: FileText },
     { name: 'Bon de commande', href: '/bon-commande', icon: FileSpreadsheet },
+    { name: 'Aide & Tuto', href: '/aide', icon: HelpCircle }, // New Link
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
